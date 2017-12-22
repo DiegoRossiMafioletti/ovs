@@ -148,6 +148,8 @@ struct netdev_flow_key {
  * If dp_netdev_input is not called from a pmd thread, a mutex is used.
  */
 
+
+// EMC table size
 #define EM_FLOW_HASH_SHIFT 13
 #define EM_FLOW_HASH_ENTRIES (1u << EM_FLOW_HASH_SHIFT)
 #define EM_FLOW_HASH_MASK (EM_FLOW_HASH_ENTRIES - 1)
@@ -2131,6 +2133,7 @@ emc_insert(struct emc_cache *cache, const struct netdev_flow_key *key,
     struct emc_entry *to_be_replaced = NULL;
     struct emc_entry *current_entry;
 
+    // EMC change entry
     EMC_FOR_EACH_POS_WITH_HASH(cache, current_entry, key->hash) {
         if (netdev_flow_key_equal(&current_entry->key, key)) {
             /* We found the entry with the 'mf' miniflow */
@@ -4936,6 +4939,7 @@ emc_processing(struct dp_netdev_pmd_thread *pmd,
             } else {
                 key->hash = dpif_netdev_packet_get_rss_hash(packet, &key->mf);
             }
+            // EMC lookup
             flow = emc_lookup(flow_cache, key);
         } else {
             flow = NULL;
@@ -5024,6 +5028,7 @@ handle_packet_upcall(struct dp_netdev_pmd_thread *pmd,
                                              add_actions->size);
         }
         ovs_mutex_unlock(&pmd->flow_mutex);
+        // EMC prob. insert
         emc_probabilistic_insert(pmd, key, netdev_flow);
     }
 }
@@ -5115,7 +5120,8 @@ fast_path_processing(struct dp_netdev_pmd_thread *pmd,
         }
 
         flow = dp_netdev_flow_cast(rules[i]);
-
+        
+        // EMC prob. insert
         emc_probabilistic_insert(pmd, &keys[i], flow);
         dp_netdev_queue_batches(packet, flow, &keys[i].mf, batches, n_batches);
     }
@@ -5149,6 +5155,7 @@ dp_netdev_input__(struct dp_netdev_pmd_thread *pmd,
     odp_port_t in_port;
 
     n_batches = 0;
+    // EMC processing
     emc_processing(pmd, packets, keys, batches, &n_batches,
                             md_is_valid, port_no);
     if (!dp_packet_batch_is_empty(packets)) {
